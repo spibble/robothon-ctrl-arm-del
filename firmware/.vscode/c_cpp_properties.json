@@ -10,6 +10,7 @@
             "includePath": [
                 "/Users/miles/Documents/GitHub/robothon-ctrl-arm-del/firmware/include",
                 "/Users/miles/Documents/GitHub/robothon-ctrl-arm-del/firmware/src",
+                "/Users/miles/Documents/GitHub/robothon-ctrl-arm-del/firmware/.pio/libdeps/freenove_esp32_wrover/ESP32Servo/src",
                 "/Users/miles/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/newlib/platform_include",
                 "/Users/miles/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include",
                 "/Users/miles/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/esp_additions/freertos",
@@ -246,6 +247,7 @@
                 "path": [
                     "/Users/miles/Documents/GitHub/robothon-ctrl-arm-del/firmware/include",
                     "/Users/miles/Documents/GitHub/robothon-ctrl-arm-del/firmware/src",
+                    "/Users/miles/Documents/GitHub/robothon-ctrl-arm-del/firmware/.pio/libdeps/freenove_esp32_wrover/ESP32Servo/src",
                     "/Users/miles/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/newlib/platform_include",
                     "/Users/miles/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include",
                     "/Users/miles/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/esp_additions/freertos",
@@ -481,7 +483,6 @@
             "defines": [
                 "PLATFORMIO=60118",
                 "ARDUINO_ESP32_DEV",
-                "BOARD_HAS_PSRAM",
                 "HAVE_CONFIG_H",
                 "MBEDTLS_CONFIG_FILE=\"mbedtls/esp_config.h\"",
                 "UNITY_INCLUDE_CONFIG_H",
@@ -495,7 +496,7 @@
                 "F_CPU=240000000L",
                 "ARDUINO=10812",
                 "ARDUINO_VARIANT=\"esp32\"",
-                "ARDUINO_BOARD=\"Freenove ESP32-Wrover\"",
+                "ARDUINO_BOARD=\"Espressif ESP32 Dev Module\"",
                 "ARDUINO_PARTITION_default",
                 ""
             ],
@@ -503,8 +504,6 @@
             "cppStandard": "gnu++11",
             "compilerPath": "/Users/miles/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-gcc",
             "compilerArgs": [
-                "-mfix-esp32-psram-cache-issue",
-                "-mfix-esp32-psram-cache-strategy=memw",
                 "-mlongcalls",
                 ""
             ]
