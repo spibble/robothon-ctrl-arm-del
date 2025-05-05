@@ -4,7 +4,7 @@ import pybullet_data
 
 physicsClient = p.connect(p.GUI) #or p.DIRECT for non-graphical version
 p.setAdditionalSearchPath(pybullet_data.getDataPath()) #optionally
-p.setGravity(0, 0, 0)
+p.setGravity(0, 0, -9.8)
 planeId = p.loadURDF("plane.urdf")
 startPos = [0, 0, 1.25]
 startOrientation = p.getQuaternionFromEuler([0,0,0])
@@ -25,7 +25,7 @@ p.resetDebugVisualizerCamera(cameraDistance=camera_distance,
                                   cameraTargetPosition=camera_target)
 count = 0
 while count < 2000:
-    p.setJointMotorControlArray(boxId, [0, 1, 2, 3, 5, 6, 8], p.VELOCITY_CONTROL, targetVelocities=[0.3] * 7, forces=[10] * 7)
+    p.setJointMotorControlArray(boxId, [0, 1, 2, 3, 5, 6, 8], p.VELOCITY_CONTROL, targetVelocities=[0.3] * 7, forces=[50] * 7)
     
     p.stepSimulation()
     time.sleep(1.0 / 240.0)  # 240 Hz simulation
