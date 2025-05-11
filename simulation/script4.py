@@ -13,7 +13,7 @@ def convert(angle, radians=True):
     return angle
 
 def dist(p1, p2 = [0, 0, 0]):
-    if (len(p1) == 2):
+    if len(p1) == 2:
         return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
     else:
         return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2)
