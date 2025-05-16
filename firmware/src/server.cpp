@@ -41,10 +41,19 @@ static void write_servo(uint8_t idx, float deg)
     if (idx >= SERVO_COUNT) return;
 
     if (idx == CR_SERVO_IDX) {
-        bool forward  = (deg >= 0);
-        float absDeg  = fabsf(deg);
+        float offset = deg - 90.0f; 
 
-        uint32_t runMs = (uint32_t)((absDeg / CR_DEG_PER_SEC) * 1000.0f);
+        
+        if (fabsf(offset) < 1.0f) { 
+            servos[idx].writeMicroseconds(CR_STOP_US);
+            crStopAt = 0;
+            return;
+        }
+        
+        bool forward = offset > 0.0f;
+        float absDeg   = fabsf(offset);
+
+        uint32_t runMs = static_cast<uint32_t>((absDeg / CR_DEG_PER_SEC) * 1000.0f);
 
         if (forward) {
           // rotate CW
@@ -72,9 +81,9 @@ static void on_ws_message(void* arg, uint8_t* data, size_t len)
     StaticJsonDocument<JSON_DOC_SIZE> doc;
     if (deserializeJson(doc, data, len)) return;
 
+    // get servo index and degree, and write to it
     uint8_t id  = doc["id"]  | 0;
     float   deg = doc["deg"] | 90.0;
-
     manual_mode = true;
     write_servo(id, deg);
 }
@@ -82,19 +91,27 @@ static void on_ws_message(void* arg, uint8_t* data, size_t len)
 // start that shit
 void init_server()
 {
-    // Serial.begin(115200);
+  bool connect_ap = true;
 
-    WiFi.begin(WIFI_SSID_RESNET, WIFI_PASS); // nab from credentials.h
+    if (connect_ap) {
+      WiFi.mode(WIFI_AP);
+      WiFi.softAP("CTRL-ARM-DEL", "ctrlarmdel");
 
-    // connect to the network
-    Serial.printf("\n[WiFi] Connecting to %s", WIFI_SSID_RESNET);
+      Serial.printf("\n[WiFi] %s  IP: %s\n", WiFi.SSID().c_str(), 
+                    WiFi.softAPIP().toString().c_str());
+    } else {
+      WiFi.begin(WIFI_SSID_UCSD, NULL); // nab from credentials.h
+      
+      Serial.printf("\n[WiFi] Connecting to %s", WIFI_SSID_UCSD);
+      
+      while (WiFi.status() != WL_CONNECTED) {
+        delay(1000);
+        Serial.printf(".");
+      }
 
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(1000);
-      Serial.printf(".");
+      Serial.printf("\n[WiFi] %s  IP: %s\n", WiFi.SSID().c_str(), 
+                    WiFi.localIP().toString().c_str());
     }
-
-    Serial.printf("\n[WiFi] %s  IP: %s\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
 
     // serve home page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest* r){

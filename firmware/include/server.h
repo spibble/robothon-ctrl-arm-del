@@ -62,7 +62,7 @@ const char CONTROL_PAGE[] PROGMEM = R"rawliteral(
       
       function buildUI(){
         const wrap=document.getElementById('sliders');
-        for(let i=0; i<SERVO_COUNT; i++ {
+        for(let i=0; i<SERVO_COUNT; i++) {
           const block = document.createElement('div');
           block.className = 'slider-block';
           block.innerHTML = `
