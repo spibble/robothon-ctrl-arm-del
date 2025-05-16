@@ -36,10 +36,16 @@ constexpr int  CW_FAST = 1900;
 constexpr int CCW_SLOW = 1300;
 constexpr int CCW_FAST = 1100;
 
+constexpr uint8_t CR_SERVO_IDX   = 0;     // channel 0 is MG996R
+constexpr float   CR_DEG_PER_SEC = 350.0; 
+constexpr int     CR_CW_US       = 1700;      
+constexpr int     CR_CCW_US      = 1300;   
+constexpr int     CR_STOP_US     = 1500;
+
 // lists of degrees just for safety purposes
-double OFF_DEG[4] = { 90,  90,  90,  90};     
-double MIN_DEG[4] = {  0,   0,   0,   0};  
-double MAX_DEG[4] = {180, 180, 180, 180};
+double OFF_DEG[6] = {0,  90,  90,  90,  90,  90};     
+double MIN_DEG[6] = {0,   0,   0,   0,   0,   0};  
+double MAX_DEG[6] = {0, 180, 180, 180, 180, 180};
 
 const float SEGMENT_LEN = 1;
 
@@ -167,8 +173,29 @@ std::vector<double> target_angles(const std::vector<double>& p, double o)
 
 void move_joint(int idx, double rad)
 {
-    if (idx > 3) return;                         
+    if (idx > 5) return;  
+    
     double deg = convert_rad_deg(rad) + OFF_DEG[idx];
+    
+        if (idx == CR_SERVO_IDX) {
+        bool forward  = (deg >= 0);
+        float abs_deg  = fabsf(deg);
+
+        uint32_t run_ms = (uint32_t)((abs_deg / CR_DEG_PER_SEC) * 1000.0f);
+
+        if (forward) {
+          // rotate CW
+            servos[idx].writeMicroseconds(CR_CW_US);
+        }
+        else {
+            // rotate CCW
+            servos[idx].writeMicroseconds(CR_CCW_US);
+        }
+
+        crStopAt = millis() + run_ms;
+        return;
+    }
+
     deg = constrain(deg, MIN_DEG[idx], MAX_DEG[idx]);
     servos[idx].write(static_cast<int>(deg));     
 }
@@ -230,7 +257,7 @@ void setup()
     }
 
     // sentence MG996R to idle
-    servos[5].writeMicroseconds(IDLE);
+    servos[CR_SERVO_IDX].writeMicroseconds(IDLE);
 
     server_setup();
 }
@@ -248,7 +275,6 @@ static std::vector<std::vector<double>> square_path = []() {
 void loop()
 {
     static size_t step = 0;
-
     server_loop();
 
     if (!manual_mode) {
@@ -257,5 +283,11 @@ void loop()
             step %= square_path.size();
         }
     }
+
+    if (crStopAt && millis() >= crStopAt) {
+        servos[CR_SERVO_IDX].writeMicroseconds(CR_STOP_US);
+        crStopAt = 0;
+    }
+
     delay(20);
 }
