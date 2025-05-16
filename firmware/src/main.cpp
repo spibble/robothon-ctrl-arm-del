@@ -1,30 +1,25 @@
-#include "esp_rom_sys.h" 
-extern "C" void early_print() __attribute__((constructor));
-extern "C" void early_print() {
-    ets_printf("\n[EARLY] made it into early_print()\n");
-}
-
-#include <Arduino.h>
-#include <ESP32Servo.h>
-#include <math.h>
-#include "server.h"
-
 #include <iostream>
 #include <vector>
 #include <cmath>
 
-const float SEGMENT_LEN = 1;
+#include <Arduino.h>
+#include <ESP32Servo.h>
+#include <math.h>
+
+#include "server.h"
 
 /*
+* ========================================
 * HARDWARE DEFINITIONS
+* ========================================
 */
 const int SERVO_PINS[6] = {
-    12,             // SG90 - 180deg - shoulder left/right
-    14,             // SG90 - 180deg - shoulder up/down
-    27,             // SG90 - 180deg - elbow rotation
-    26,             // SG90 - 180deg - elbow folding
-    33,             // SG90 - 180deg - hand/gripper rotation
-    32              // MG996R - 360d - base
+    12,             // [0]: shoulder left/right (MG996R)
+    14,             // [1]: shoulder up/down (SG90)
+    27,             // [2]: forearm rotation (SG90)
+    26,             // [3]: elbow folding (SG90)
+    25,             // [4]: hand left/right (SG90)
+    33              // [5]: hand up/down (SG90)
 };
 
 Servo servos[6];
@@ -41,21 +36,24 @@ constexpr int  CW_FAST = 1900;
 constexpr int CCW_SLOW = 1300;
 constexpr int CCW_FAST = 1100;
 
-
 // lists of degrees just for safety purposes
 double OFF_DEG[4] = { 90,  90,  90,  90};     
 double MIN_DEG[4] = {  0,   0,   0,   0};  
 double MAX_DEG[4] = {180, 180, 180, 180};
 
+const float SEGMENT_LEN = 1;
+
 /*
+* ========================================
 * COOL MATH STUFF
+* ========================================
 */
 
-// Convert between radians and degrees
+// Convert radians <-> degrees
 double convert_rad_deg(double r) { return r * 180.0 / PI; }
 double convert_deg_rad(double d) { return d * PI / 180.0; }
 
-// Fix any angle to be in the interval [-pi, pi]
+// Fix angle to [-pi, pi]
 double fixAngle(double angle)
 {
     // downscale(?) angle to [-360, 360]
@@ -104,7 +102,9 @@ std::vector<double> matVec(const std::vector<std::vector<double>>& m,
 }
 
 /*
+* ========================================
 * INVERSE KINEMATICS TYPE SHIT
+* ========================================
 */
 
 // Find the position of the first point
@@ -159,15 +159,18 @@ std::vector<double> target_angles(const std::vector<double>& p, double o)
     return a;
 }
 
-// -----------------------------------------------------------------------------
-// Servo mapping & movement
-// -----------------------------------------------------------------------------
+/*
+* ========================================
+* SERVO MOVEMENT TYPE SHIT
+* ========================================
+*/
+
 void move_joint(int idx, double rad)
 {
-    if (idx > 3) return;                            // safety
+    if (idx > 3) return;                         
     double deg = convert_rad_deg(rad) + OFF_DEG[idx];
     deg = constrain(deg, MIN_DEG[idx], MAX_DEG[idx]);
-    servos[idx].write(static_cast<int>(deg));       // 0–180° SG90 path
+    servos[idx].write(static_cast<int>(deg));     
 }
 
 void move_segment(int seg, const std::vector<double>& a)
@@ -213,7 +216,9 @@ bool move_to(const std::vector<double>& p)
 }
 
 /*
-* FIRMWARE SCHEDULER TYPE SHIT
+* ========================================
+* FIRMWARE TYPE SHIT
+* ========================================
 */
 void setup()
 {
@@ -227,7 +232,7 @@ void setup()
     // sentence MG996R to idle
     servos[5].writeMicroseconds(IDLE);
 
-    init_server();
+    server_setup();
 }
 
 // script3.py - make a square
@@ -243,6 +248,8 @@ static std::vector<std::vector<double>> square_path = []() {
 void loop()
 {
     static size_t step = 0;
+
+    server_loop();
 
     if (!manual_mode) {
         if (move_to((square_path)[step])) {

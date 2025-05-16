@@ -12,3 +12,5 @@ extern const std::vector<std::vector<double>>* current_path;
 extern bool manual_mode;  
 
 void init_server();
+void server_setup();
+void server_loop();

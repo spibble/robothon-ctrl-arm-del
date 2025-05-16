@@ -506,7 +506,7 @@
                 "ARDUINO=10812",
                 "ARDUINO_VARIANT=\"esp32\"",
                 "ARDUINO_BOARD=\"Freenove ESP32-Wrover\"",
-                "ARDUINO_PARTITION_default_8MB",
+                "ARDUINO_PARTITION_default",
                 ""
             ],
             "cStandard": "gnu99",

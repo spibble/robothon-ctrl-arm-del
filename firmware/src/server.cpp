@@ -1,43 +1,48 @@
-#include "server.h"
+// ─────────────────────────────────── server.h ────────────────────────────────
 #include "credentials.h"
 
-#include <Arduino.h>              
-#include <ESP32Servo.h>           
+#include <Arduino.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <ESP32Servo.h>
 #include <ArduinoJson.h>
 
-AsyncWebServer server(80);
-AsyncWebSocket ws("/ws");
+// ── compile‑time knobs ────────────────────────────────────────────────────────
+#define SERVO_COUNT 6                 // change if you really have 6 joints
+#define JSON_DOC_SIZE 128             // plenty of room for future keys
 
-bool manual_mode = true;    
+// ── globals ──────────────────────────────────────────────────────────────────
+extern Servo   servos[SERVO_COUNT];
+extern double  MIN_DEG[SERVO_COUNT];
+extern double  MAX_DEG[SERVO_COUNT];
 
-static void on_ws_message(void*, uint8_t*, size_t);
+AsyncWebServer  server(80);
+AsyncWebSocket  ws("/ws");
 
-extern Servo servos[];
-extern double MIN_DEG[];
-extern double MAX_DEG[];
+bool manual_mode = true;              // auto‑runner pauses when true
 
-/*
-* HELPER TYPE SHIT
-*/
+// ── helpers ──────────────────────────────────────────────────────────────────
+static String htmlProcessor(const String& var)
+{
+    if (var == "SERVO_COUNT") return String(SERVO_COUNT);
+    return String();                     
+}
+
 static void write_servo(uint8_t idx, float deg)
 {
-    if (idx > 3) return;                       
+    if (idx >= SERVO_COUNT) return;               // guard array bounds
     deg = constrain(deg, MIN_DEG[idx], MAX_DEG[idx]);
     servos[idx].write(static_cast<int>(deg));
 }
 
-/*
-* WEBSOCKET TYPE SHIT
-*/
+// ── WebSocket frame handler ──────────────────────────────────────────────────
 static void on_ws_message(void* arg, uint8_t* data, size_t len)
 {
     AwsFrameInfo* info = static_cast<AwsFrameInfo*>(arg);
     if (!info->final || info->opcode != WS_TEXT) return;
 
-    StaticJsonDocument<64> doc;
+    StaticJsonDocument<JSON_DOC_SIZE> doc;
     if (deserializeJson(doc, data, len)) return;
 
     uint8_t id  = doc["id"]  | 0;
@@ -47,49 +52,97 @@ static void on_ws_message(void* arg, uint8_t* data, size_t len)
     write_servo(id, deg);
 }
 
-/*
-* ACTUAL SERVER STUFF
-*/
+// ── HTML user‑interface (served from flash) ──────────────────────────────────
+static const char CONTROL_PAGE[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CTRL ARM DEL</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+ body{font-family:sans-serif;margin:2rem;max-width:480px}
+ h1  {font-size:1.4rem;margin-bottom:1rem}
+ .slider-block{margin:1rem 0}
+ label{display:block;font-weight:bold;margin-bottom:0.3rem}
+ input[type=range]{width:100%%;}        
+</style>
+</head>
+<body>
+<h1>Manual Control</h1>
+
+<div id="sliders"></div>
+
+<script>
+const SERVO_COUNT = %SERVO_COUNT%;      
+const socket = new WebSocket(`ws://${location.host}/ws`);
+
+socket.addEventListener('open', () => console.log('WS connected'));
+
+function sendAngle(id, deg){
+  if(socket.readyState===1) socket.send(JSON.stringify({id,deg}));
+}
+
+function buildUI(){
+  const wrap=document.getElementById('sliders');
+  for(let i=0;i<SERVO_COUNT;i++){
+    const block=document.createElement('div');
+    block.className='slider-block';
+    block.innerHTML = `
+      <label for="s${i}">Servo ${i}</label>
+      <input id="s${i}" type="range" min="0" max="180" value="90">
+    `;
+    block.querySelector('input').addEventListener('input', e=>{
+      sendAngle(i, parseInt(e.target.value));
+    });
+    wrap.appendChild(block);
+  }
+}
+buildUI();
+</script>
+</body>
+</html>
+)rawliteral";
+
+// ── Wi‑Fi + server bring‑up ──────────────────────────────────────────────────
 void init_server()
 {
-    WiFi.begin(WIFI_SSID, NULL);
-    while (WiFi.status() != WL_CONNECTED) delay(200);
+    Serial.begin(115200);
 
-    Serial.printf("[Wi‑Fi] connected to \"%s\" — IP: %s\n",
-                    WiFi.SSID().c_str(),
-                    WiFi.localIP().toString().c_str());
+    // resnet guest: 100.117.32.66
 
-    static const char page[] PROGMEM = R"(<!DOCTYPE html> ... )";
+    WiFi.begin(WIFI_SSID_RESNET, WIFI_PASS);      // adjust for your net
+    unsigned long t0 = millis();
+    while (WiFi.status() != WL_CONNECTED && millis()-t0 < 15000){
+        delay(250);
+        Serial.print('.');
+    }
+    if (WiFi.status() != WL_CONNECTED){
+        Serial.println("\n[Wi‑Fi] failed to connect"); return;
+    }
 
-    server.on("/", HTTP_GET,
-        [](AsyncWebServerRequest* r){ r->send_P(200,"text/html",page); });
+    Serial.printf("\n[Wi‑Fi] %s  IP: %s\n",
+                  WiFi.SSID().c_str(),
+                  WiFi.localIP().toString().c_str());
 
-    server.on("/set", HTTP_GET,
-        [](AsyncWebServerRequest* r){
-            if (!r->hasParam("mode")) { r->send(400); return; }
+    // root -> control page
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest* r){
+    r->send_P(200,
+              "text/html",
+              CONTROL_PAGE,        // PROGMEM string
+              htmlProcessor);      // <- template callback
+});
 
-            /*
-            String m = r->getParam("mode")->value();
-            if      (m == "square") current_path = &square_path;
-            else if (m == "spin")   current_path = &spin_path;
-            else if (m == "pitch")  current_path = &pitch_sweep_path;
-            manual_mode = false;               // resume auto runner
-            */
-            r->send(200,"text/plain","OK");
-        });
-
-    ws.onEvent([](  AsyncWebSocket*,
-                    AsyncWebSocketClient*,
-                    AwsEventType t,
-                    void* arg,
-                    uint8_t* data,
-                    size_t len)
-    {
-        if (t == WS_EVT_DATA) on_ws_message(arg, data, len);
+    // add WebSocket and delegate data frames
+    ws.onEvent([](  AsyncWebSocket*,AsyncWebSocketClient*,AwsEventType t,
+                    void* arg,uint8_t* data,size_t len){
+        if(t==WS_EVT_DATA) on_ws_message(arg,data,len);
     });
     server.addHandler(&ws);
 
     server.begin();
+    Serial.println("[HTTP] server started");
 }
 
-void server_setup() { init_server(); }
+void server_setup(){ init_server(); }
+void server_loop(){ ws.cleanupClients(); }
